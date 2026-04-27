@@ -1,5 +1,5 @@
-{
-  "name": "drama-generator-temp",
+﻿{
+  "name": "drama-generator",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -24,3 +24,4 @@
     "typescript": "^5"
   }
 }
+
