@@ -4,9 +4,9 @@ import { SCRIPT_SYSTEM_PROMPT, buildScriptPrompt } from '@/lib/prompts'
 import type { SeriesBible, EpisodeOutline, EpisodeScript } from '@/lib/types'
 
 export async function POST(req: NextRequest) {
-  if (!process.env.XAI_API_KEY) {
+  if (!process.env.KIE_API_KEY) {
     return NextResponse.json(
-      { error: 'XAI_API_KEY is not configured. Add it to your .env.local file.' },
+      { error: 'KIE_API_KEY is not configured. Add it to your .env.local file.' },
       { status: 503 }
     )
   }

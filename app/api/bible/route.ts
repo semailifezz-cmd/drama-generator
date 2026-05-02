@@ -4,9 +4,9 @@ import { BIBLE_SYSTEM_PROMPT, buildBiblePrompt } from '@/lib/prompts'
 import type { UniversePrompt } from '@/lib/types'
 
 export async function POST(req: NextRequest) {
-  if (!process.env.XAI_API_KEY) {
+  if (!process.env.KIE_API_KEY) {
     return NextResponse.json(
-      { error: 'XAI_API_KEY is not configured. Add it to your .env.local file.' },
+      { error: 'KIE_API_KEY is not configured. Add it to your .env.local file.' },
       { status: 503 }
     )
   }

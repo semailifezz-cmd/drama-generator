@@ -1,21 +1,23 @@
-const XAI_BASE = 'https://api.x.ai/v1'
+// Uses Gemini 2.5 Flash via Kie.ai (OpenAI-compatible, synchronous)
+const KIE_LLM_BASE = 'https://api.kie.ai/gemini-2.5-flash/v1'
 
 export async function callGrok(
   messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>,
   options: { temperature?: number; maxTokens?: number } = {}
 ): Promise<string> {
-  const apiKey = process.env.XAI_API_KEY
-  if (!apiKey) throw new Error('XAI_API_KEY not configured')
+  const apiKey = process.env.KIE_API_KEY
+  if (!apiKey) throw new Error('KIE_API_KEY not configured. Add it to .env.local or Vercel env vars.')
 
-  const response = await fetch(`${XAI_BASE}/chat/completions`, {
+  const response = await fetch(`${KIE_LLM_BASE}/chat/completions`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'grok-3',
+      model: 'gemini-2.5-flash',
       messages,
+      stream: false,
       temperature: options.temperature ?? 0.8,
       max_tokens: options.maxTokens ?? 32768,
     }),
@@ -23,7 +25,7 @@ export async function callGrok(
 
   if (!response.ok) {
     const error = await response.text()
-    throw new Error(`xAI API error ${response.status}: ${error}`)
+    throw new Error(`Gemini API error ${response.status}: ${error}`)
   }
 
   const data = await response.json()
