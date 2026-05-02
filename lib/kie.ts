@@ -33,6 +33,7 @@ export type KieState = 'waiting' | 'queuing' | 'generating' | 'success' | 'fail'
 export interface PollResult {
   state: KieState
   resultUrls: string[]
+  failReason?: string
 }
 
 export async function pollTask(taskId: string): Promise<PollResult> {
@@ -45,16 +46,24 @@ export async function pollTask(taskId: string): Promise<PollResult> {
 
   const task = data.data
   let resultUrls: string[] = []
+  let failReason: string | undefined
+
   if (task.resultJson) {
     try {
       const parsed = JSON.parse(task.resultJson)
       resultUrls = parsed.resultUrls ?? []
+      if (parsed.errorMsg) failReason = parsed.errorMsg
+      if (parsed.error) failReason = parsed.error
     } catch {
-      // non-critical — empty result is fine during generation
+      // non-critical
     }
   }
 
-  return { state: task.state as KieState, resultUrls }
+  // Fall back to top-level fields Kie.ai may include
+  if (!failReason && task.errorMsg) failReason = task.errorMsg
+  if (!failReason && task.state === 'fail') failReason = `Task ${taskId} reported state=fail (no reason provided)`
+
+  return { state: task.state as KieState, resultUrls, failReason }
 }
 
 // Phase 3: Generate a single reference image (character portrait, venue shot, prop)

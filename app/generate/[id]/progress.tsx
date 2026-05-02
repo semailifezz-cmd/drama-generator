@@ -309,45 +309,55 @@ export default function Progress({ id }: { id: string }) {
       // ── Phase 6: Video Generation ──────────────────────────────────────
       const allScenes = injectedScripts.flatMap(s => s.scenes)
       const newVideoUrls: Record<string, string> = {}
+      const failedClips: string[] = []
 
       for (let i = 0; i < allScenes.length; i++) {
         const scene = allScenes[i]
         const key = `ep${scene.ep_num}_clip${scene.clip_num}`
         setPhase(5, 'running', `Clip ${i + 1} / ${allScenes.length} — Ep ${scene.ep_num} · Scene ${scene.clip_num} · Formula Step ${scene.formula_step}`, (i / allScenes.length) * 100)
 
-        const submitRes = await fetch('/api/videos', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            prompt: scene.final_prompt,
-            image_urls: scene.grok_ref_images ?? [],
-            duration: 15,
-            aspect_ratio: '9:16',
-            resolution: '720p',
-          }),
-        })
-        if (!submitRes.ok) {
-          const err = await submitRes.json()
-          throw new Error(err.error ?? 'Video submission failed')
-        }
-        const { jobId } = await submitRes.json()
+        try {
+          const submitRes = await fetch('/api/videos', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              prompt: scene.final_prompt,
+              image_urls: scene.grok_ref_images ?? [],
+              duration: 15,
+              aspect_ratio: '9:16',
+              resolution: '720p',
+            }),
+          })
+          if (!submitRes.ok) {
+            const err = await submitRes.json()
+            throw new Error(err.error ?? 'Video submission failed')
+          }
+          const { jobId } = await submitRes.json()
 
-        let videoUrl = ''
-        for (let attempt = 0; attempt < 30 && !videoUrl; attempt++) {
-          await sleep(5000)
-          const pollRes = await fetch(`/api/videos/${jobId}`)
-          const { status, url } = await pollRes.json()
-          if (status === 'done' && url) videoUrl = url
-          else if (status === 'failed') throw new Error(`Video failed for ${key}`)
-        }
+          let videoUrl = ''
+          for (let attempt = 0; attempt < 30 && !videoUrl; attempt++) {
+            await sleep(5000)
+            const pollRes = await fetch(`/api/videos/${jobId}`)
+            const { status, url, reason } = await pollRes.json()
+            if (status === 'done' && url) videoUrl = url
+            else if (status === 'failed') throw new Error(`Kie.ai video failed for ${key}${reason ? ` — ${reason}` : ''}`)
+          }
 
-        if (videoUrl) {
-          newVideoUrls[key] = videoUrl
-          setVideoUrls(prev => ({ ...prev, [key]: videoUrl }))
+          if (videoUrl) {
+            newVideoUrls[key] = videoUrl
+            setVideoUrls(prev => ({ ...prev, [key]: videoUrl }))
+          } else {
+            throw new Error(`${key} timed out after 30 polls`)
+          }
+        } catch (clipErr) {
+          const msg = clipErr instanceof Error ? clipErr.message : String(clipErr)
+          failedClips.push(`${key}: ${msg}`)
+          // Continue with remaining clips — don't crash the pipeline
         }
       }
 
-      setPhase(5, 'done', `${Object.keys(newVideoUrls).length} clips generated`, 100)
+      const failNote = failedClips.length > 0 ? ` (${failedClips.length} failed: ${failedClips.join(' | ')})` : ''
+      setPhase(5, 'done', `${Object.keys(newVideoUrls).length} / ${allScenes.length} clips generated${failNote}`, 100)
 
       // ── Phase 7: Episode Stitching ─────────────────────────────────────
       setPhase(6, 'running', 'Stitching 4 clips into 60-second episodes…')
