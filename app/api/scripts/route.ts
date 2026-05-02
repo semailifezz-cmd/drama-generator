@@ -28,13 +28,27 @@ export async function POST(req: NextRequest) {
       { temperature: 0.9, maxTokens: 8192 }
     )
 
-    const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim()
-    const scenes = JSON.parse(cleaned)
+    const arrayMatch = raw.match(/\[[\s\S]*\]/)
+    if (!arrayMatch) {
+      return NextResponse.json(
+        { error: `Gemini did not return JSON. Raw response: "${raw.slice(0, 400)}"` },
+        { status: 500 }
+      )
+    }
+    let scenes
+    try {
+      scenes = JSON.parse(arrayMatch[0])
+    } catch {
+      return NextResponse.json(
+        { error: `JSON parse failed for episode ${episode.ep_num}. Extracted text: "${arrayMatch[0].slice(0, 400)}"` },
+        { status: 500 }
+      )
+    }
 
     const script: EpisodeScript = { ep_num: episode.ep_num, scenes }
     return NextResponse.json(script)
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json({ error: `scripts/route: ${message}` }, { status: 500 })
   }
 }

@@ -27,12 +27,25 @@ export async function POST(req: NextRequest) {
       { temperature: 0.85, maxTokens: 32768 }
     )
 
-    // Strip any accidental markdown fences
-    const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim()
-    const bible = JSON.parse(cleaned)
+    const objMatch = raw.match(/\{[\s\S]*\}/)
+    if (!objMatch) {
+      return NextResponse.json(
+        { error: `Gemini did not return JSON. Raw response: "${raw.slice(0, 400)}"` },
+        { status: 500 }
+      )
+    }
+    let bible
+    try {
+      bible = JSON.parse(objMatch[0])
+    } catch {
+      return NextResponse.json(
+        { error: `JSON parse failed for series bible. Extracted text: "${objMatch[0].slice(0, 400)}"` },
+        { status: 500 }
+      )
+    }
     return NextResponse.json(bible)
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json({ error: `bible/route: ${message}` }, { status: 500 })
   }
 }

@@ -1,6 +1,6 @@
 import type { UniversePrompt, SeriesBible, EpisodeOutline } from './types'
 
-export const BIBLE_SYSTEM_PROMPT = `You are a professional drama series showrunner. Generate a complete series bible in valid JSON format. Output ONLY the raw JSON object — no markdown, no code fences, no explanations. Ensure all JSON strings are properly escaped.`
+export const BIBLE_SYSTEM_PROMPT = `You are a professional drama series showrunner. Your response must be a raw JSON object and nothing else — no greeting, no explanation, no markdown, no code fences. Start your response with { and end with }. Any text outside the JSON object will break the pipeline.`
 
 export function buildBiblePrompt(input: UniversePrompt): string {
   const charCount = input.main_characters.match(/\d+/)?.[0] ?? '4'
@@ -73,7 +73,7 @@ Requirements:
 - Make character physical descriptions very specific for image generation`
 }
 
-export const SCRIPT_SYSTEM_PROMPT = `You are a professional drama screenwriter. Generate scene-by-scene video prompts following the episode formula exactly. Output ONLY a valid JSON array. No markdown, no code fences.`
+export const SCRIPT_SYSTEM_PROMPT = `You are a professional drama screenwriter. Your response must be a raw JSON array and nothing else — no greeting, no explanation, no markdown, no code fences. Start your response with [ and end with ]. Any text outside the JSON array will break the pipeline.`
 
 export function buildScriptPrompt(
   episode: EpisodeOutline,
