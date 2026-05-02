@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Drama Generator",
-  description: "Generate drama with ease",
+  title: "Drama Generator — AI Drama Series Pipeline",
+  description: "Turn a single prompt into a fully produced 20-episode AI drama series with consistent characters, cinematic scene scripts, and stitched 60-second episodes.",
 };
 
 export default function RootLayout({
