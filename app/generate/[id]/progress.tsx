@@ -169,6 +169,7 @@ export default function Progress({ id }: { id: string }) {
   const [refImages, setRefImages] = useState<Record<string, string>>({})
   const [scripts, setScripts] = useState<EpisodeScript[]>([])
   const [videoUrls, setVideoUrls] = useState<Record<string, string>>({})
+  const [failedClips, setFailedClips] = useState<string[]>([])
   const [isComplete, setIsComplete] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const startedRef = useRef(false)
@@ -182,9 +183,10 @@ export default function Progress({ id }: { id: string }) {
     const saved = localStorage.getItem(`drama_${id}_result`)
     if (saved) {
       try {
-        const { videoUrls: savedUrls, bible: savedBible } = JSON.parse(saved)
-        setVideoUrls(savedUrls)
+        const { videoUrls: savedUrls, bible: savedBible, failedClips: savedFailed } = JSON.parse(saved)
+        setVideoUrls(savedUrls ?? {})
         setBible(savedBible)
+        setFailedClips(savedFailed ?? [])
         setIsComplete(true)
         setPhases(PHASES.map(() => ({ status: 'done' as PhaseStatus, progress: 100, detail: '' })))
         setCurrentPhase(PHASES.length - 1)
@@ -356,7 +358,8 @@ export default function Progress({ id }: { id: string }) {
         }
       }
 
-      const failNote = failedClips.length > 0 ? ` (${failedClips.length} failed: ${failedClips.join(' | ')})` : ''
+      setFailedClips(failedClips)
+      const failNote = failedClips.length > 0 ? ` · ${failedClips.length} failed` : ''
       setPhase(5, 'done', `${Object.keys(newVideoUrls).length} / ${allScenes.length} clips generated${failNote}`, 100)
 
       // ── Phase 7: Episode Stitching ─────────────────────────────────────
@@ -368,6 +371,7 @@ export default function Progress({ id }: { id: string }) {
       localStorage.setItem(`drama_${id}_result`, JSON.stringify({
         videoUrls: newVideoUrls,
         bible: bibleData,
+        failedClips,
       }))
 
       setIsComplete(true)
@@ -648,27 +652,36 @@ export default function Progress({ id }: { id: string }) {
         {isComplete && bible && (
           <div className="space-y-6">
             {/* Complete header */}
-            <div className="bg-green-950/20 border border-green-900/60 rounded-xl p-6 flex items-center justify-between gap-4 flex-wrap">
+            <div className={`border rounded-xl p-6 flex items-center justify-between gap-4 flex-wrap ${
+              totalClips > 0
+                ? 'bg-green-950/20 border-green-900/60'
+                : 'bg-yellow-950/20 border-yellow-900/60'
+            }`}>
               <div>
-                <p className="text-2xl font-bold text-green-400">Series Complete</p>
+                <p className={`text-2xl font-bold ${totalClips > 0 ? 'text-green-400' : 'text-yellow-400'}`}>
+                  {totalClips > 0 ? 'Series Complete' : 'Pipeline Complete — No Videos'}
+                </p>
                 <p className="text-zinc-400 text-sm mt-1">
-                  {bible.episodes.length} episode{bible.episodes.length > 1 ? 's' : ''} · {totalClips} clips · Ready to download
+                  {bible.episodes.length} episode{bible.episodes.length > 1 ? 's' : ''} · {totalClips} clips generated
+                  {failedClips.length > 0 && ` · ${failedClips.length} clips failed`}
                 </p>
               </div>
               <div className="flex gap-3 flex-wrap">
-                <button
-                  onClick={async () => {
-                    for (const [key, url] of Object.entries(videoUrls)) {
-                      const [ep, clip] = key.replace('ep', 'Ep').replace('_clip', '_Clip').split('_')
-                      const filename = `${(formData?.series_title ?? 'Series').replace(/\s+/g, '_')}_${ep}_${clip}.mp4`
-                      await downloadVideo(url, filename)
-                      await sleep(400)
-                    }
-                  }}
-                  className="text-sm bg-green-800 hover:bg-green-700 text-green-100 px-5 py-2.5 rounded-lg font-semibold transition-colors"
-                >
-                  ↓ Download All {totalClips} Clips
-                </button>
+                {totalClips > 0 && (
+                  <button
+                    onClick={async () => {
+                      for (const [key, url] of Object.entries(videoUrls)) {
+                        const [ep, clip] = key.replace('ep', 'Ep').replace('_clip', '_Clip').split('_')
+                        const filename = `${(formData?.series_title ?? 'Series').replace(/\s+/g, '_')}_${ep}_${clip}.mp4`
+                        await downloadVideo(url, filename)
+                        await sleep(400)
+                      }
+                    }}
+                    className="text-sm bg-green-800 hover:bg-green-700 text-green-100 px-5 py-2.5 rounded-lg font-semibold transition-colors"
+                  >
+                    ↓ Download All {totalClips} Clips
+                  </button>
+                )}
                 <button
                   onClick={() => router.push('/')}
                   className="text-sm bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-5 py-2.5 rounded-lg transition-colors"
@@ -678,8 +691,27 @@ export default function Progress({ id }: { id: string }) {
               </div>
             </div>
 
+            {/* Failed clips warning */}
+            {failedClips.length > 0 && (
+              <div className="bg-red-950/20 border border-red-900/60 rounded-xl p-5">
+                <p className="text-sm font-semibold text-red-400 mb-3">
+                  {failedClips.length} clip{failedClips.length > 1 ? 's' : ''} failed to generate
+                </p>
+                <div className="space-y-1.5">
+                  {failedClips.map((msg, i) => (
+                    <p key={i} className="text-xs font-mono text-red-300/70 break-all">{msg}</p>
+                  ))}
+                </div>
+                {failedClips.every(m => m.toLowerCase().includes('credit') || m.toLowerCase().includes('quota') || m.toLowerCase().includes('insufficient')) && (
+                  <p className="text-xs text-yellow-400/80 mt-3 pt-3 border-t border-red-900/40">
+                    This looks like a Kie.ai credit/quota issue. Top up your balance at kie.ai and retry.
+                  </p>
+                )}
+              </div>
+            )}
+
             {/* Episode cards */}
-            {bible.episodes.map(ep => (
+            {totalClips > 0 && bible.episodes.map(ep => (
               <EpisodeResultCard
                 key={ep.ep_num}
                 episode={ep}
