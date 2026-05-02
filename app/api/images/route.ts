@@ -4,22 +4,18 @@ import { submitImageJob } from '@/lib/kie'
 export async function POST(req: NextRequest) {
   if (!process.env.KIE_API_KEY) {
     return NextResponse.json(
-      { error: 'KIE_API_KEY is not configured. Add it to your .env.local file.' },
+      { error: 'KIE_API_KEY is not configured.' },
       { status: 503 }
     )
   }
 
   const { prompt } = await req.json()
-
-  if (!prompt) {
-    return NextResponse.json({ error: 'prompt is required' }, { status: 400 })
-  }
+  if (!prompt) return NextResponse.json({ error: 'prompt is required' }, { status: 400 })
 
   try {
-    const jobId = await submitImageJob(prompt)
-    return NextResponse.json({ jobId })
+    const taskId = await submitImageJob(prompt)
+    return NextResponse.json({ jobId: taskId })
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 })
   }
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { pollImage } from '@/lib/kie'
+import { pollTask } from '@/lib/kie'
+import { persistUrl } from '@/lib/blob'
 
 export async function GET(
   _req: NextRequest,
@@ -8,10 +9,22 @@ export async function GET(
   const { jobId } = await params
 
   try {
-    const result = await pollImage(jobId)
-    return NextResponse.json(result)
+    const { state, resultUrls } = await pollTask(jobId)
+
+    if (state === 'success' && resultUrls.length > 0) {
+      const rawUrl = resultUrls[0]
+      const filename = `images/${jobId}.jpg`
+      const image_url = await persistUrl(rawUrl, filename)
+      return NextResponse.json({ status: 'done', image_url })
+    }
+
+    if (state === 'fail') {
+      return NextResponse.json({ status: 'failed' })
+    }
+
+    // waiting | queuing | generating
+    return NextResponse.json({ status: 'processing' })
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 })
   }
 }
