@@ -198,6 +198,7 @@ export default function Home() {
                   onChange={e => setForm(p => ({ ...p, total_episodes: parseInt(e.target.value) }))}
                   className={inputClass}
                 >
+                  <option value={1}>1 episode (~$3)</option>
                   <option value={5}>5 episodes (~$16)</option>
                   <option value={10}>10 episodes (~$33)</option>
                   <option value={20}>20 episodes (~$65)</option>
