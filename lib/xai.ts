@@ -29,5 +29,17 @@ export async function callGrok(
   }
 
   const data = await response.json()
+
+  // Surface API-level errors returned in the body (e.g. quota exceeded, invalid key)
+  if (data.error) {
+    throw new Error(`Gemini API error: ${typeof data.error === 'object' ? JSON.stringify(data.error) : data.error}`)
+  }
+  if (!data.choices || data.choices.length === 0) {
+    throw new Error(`Gemini returned no choices. Full response: ${JSON.stringify(data).slice(0, 500)}`)
+  }
+  if (!data.choices[0].message?.content) {
+    throw new Error(`Gemini choice has no content. Choice: ${JSON.stringify(data.choices[0]).slice(0, 300)}`)
+  }
+
   return data.choices[0].message.content
 }
