@@ -169,6 +169,7 @@ export default function Progress({ id }: { id: string }) {
   const [refImages, setRefImages] = useState<Record<string, string>>({})
   const [scripts, setScripts] = useState<EpisodeScript[]>([])
   const [videoUrls, setVideoUrls] = useState<Record<string, string>>({})
+  const [videoErrors, setVideoErrors] = useState<Record<string, string>>({})
   const [isComplete, setIsComplete] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const startedRef = useRef(false)
@@ -338,10 +339,18 @@ export default function Progress({ id }: { id: string }) {
           const pollRes = await fetch(`/api/videos/${jobId}`)
           const { status, url, reason } = await pollRes.json()
           if (status === 'done' && url) videoUrl = url
-          else if (status === 'failed') throw new Error(`${key} failed — ${reason ?? 'Kie.ai reported failure (check credits at kie.ai)'}`)
+          else if (status === 'failed') {
+            const msg = reason ?? 'Kie.ai reported failure (check credits at kie.ai)'
+            setVideoErrors(prev => ({ ...prev, [key]: msg }))
+            throw new Error(`${key} failed — ${msg}`)
+          }
         }
 
-        if (!videoUrl) throw new Error(`${key} timed out after 30 polls`)
+        if (!videoUrl) {
+          const msg = 'Timed out after 300 s — check credits at kie.ai'
+          setVideoErrors(prev => ({ ...prev, [key]: msg }))
+          throw new Error(`${key} timed out after 60 polls`)
+        }
 
         newVideoUrls[key] = videoUrl
         setVideoUrls(prev => ({ ...prev, [key]: videoUrl }))
@@ -630,18 +639,57 @@ export default function Progress({ id }: { id: string }) {
                 </div>
               )}
 
-              {/* Live video clip counter */}
-              {totalClips > 0 && !isComplete && (
+              {/* Live video clips — preview + download as each one lands */}
+              {(totalClips > 0 || Object.keys(videoErrors).length > 0) && !isComplete && bible && (
                 <div className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-6">
-                  <p className="font-mono text-[11px] uppercase tracking-widest text-zinc-500 mb-2">
-                    Video Clips Generated
+                  <p className="font-mono text-[11px] uppercase tracking-widest text-zinc-500 mb-4">
+                    Video Clips — {totalClips} / {(formData?.total_episodes ?? 1) * 4} ready
                   </p>
-                  <p className="text-3xl font-bold text-white">
-                    {totalClips}
-                    <span className="text-zinc-600 text-lg font-normal ml-2">
-                      / {(formData?.total_episodes ?? 1) * 4} clips
-                    </span>
-                  </p>
+                  <div className="space-y-6">
+                    {bible.episodes.map(ep => {
+                      const clips = [1, 2, 3, 4]
+                      const hasAny = clips.some(c => {
+                        const k = `ep${ep.ep_num}_clip${c}`
+                        return videoUrls[k] || videoErrors[k]
+                      })
+                      if (!hasAny) return null
+                      return (
+                        <div key={ep.ep_num}>
+                          <p className="text-[11px] font-mono text-zinc-400 font-semibold mb-3">
+                            Episode {ep.ep_num}: {ep.title}
+                          </p>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            {clips.map(clip => {
+                              const k = `ep${ep.ep_num}_clip${clip}`
+                              const url = videoUrls[k]
+                              const err = videoErrors[k]
+                              if (url) {
+                                return (
+                                  <VideoCard
+                                    key={clip}
+                                    epNum={ep.ep_num}
+                                    clipNum={clip}
+                                    formulaStep={clip}
+                                    url={url}
+                                    seriesTitle={formData?.series_title ?? 'Series'}
+                                  />
+                                )
+                              }
+                              if (err) {
+                                return (
+                                  <div key={clip} className="bg-red-950/30 border border-red-900/60 rounded-xl p-3 flex flex-col gap-1">
+                                    <p className="text-[11px] font-mono text-red-400 font-semibold">Clip {clip} Failed</p>
+                                    <p className="text-[10px] text-red-300/70 font-mono break-all leading-relaxed">{err}</p>
+                                  </div>
+                                )
+                              }
+                              return null
+                            })}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
                 </div>
               )}
             </div>
