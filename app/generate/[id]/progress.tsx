@@ -314,42 +314,56 @@ export default function Progress({ id }: { id: string }) {
       for (let i = 0; i < allScenes.length; i++) {
         const scene = allScenes[i]
         const key = `ep${scene.ep_num}_clip${scene.clip_num}`
-        setPhase(5, 'running', `Clip ${i + 1} / ${allScenes.length} — Ep ${scene.ep_num} · Scene ${scene.clip_num} · Formula Step ${scene.formula_step}`, (i / allScenes.length) * 100)
-
-        const submitRes = await fetch('/api/videos', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            prompt: scene.final_prompt,
-            image_urls: scene.grok_ref_images ?? [],
-            duration: 15,
-            aspect_ratio: '9:16',
-            resolution: '720p',
-          }),
-        })
-        if (!submitRes.ok) {
-          const err = await submitRes.json()
-          throw new Error(err.error ?? `Video submission failed for ${key}`)
-        }
-        const { jobId } = await submitRes.json()
-
+        // Retry loop — keep submitting new jobs until we get a URL or 5 min elapses
+        const deadline = Date.now() + 5 * 60 * 1000
         let videoUrl = ''
-        for (let attempt = 0; attempt < 60 && !videoUrl; attempt++) {
-          await sleep(5000)
-          const pollRes = await fetch(`/api/videos/${jobId}`)
-          const { status, url, reason } = await pollRes.json()
-          if (status === 'done' && url) videoUrl = url
-          else if (status === 'failed') {
-            const msg = reason ?? 'Kie.ai reported failure (check credits at kie.ai)'
-            setVideoErrors(prev => ({ ...prev, [key]: msg }))
-            throw new Error(`${key} failed — ${msg}`)
+        let lastFailReason = ''
+        let attemptNum = 0
+
+        while (Date.now() < deadline && !videoUrl) {
+          attemptNum++
+          const remaining = Math.round((deadline - Date.now()) / 1000)
+          setPhase(
+            5, 'running',
+            `Clip ${i + 1} / ${allScenes.length} — Ep ${scene.ep_num} · Clip ${scene.clip_num} · Attempt ${attemptNum} (${remaining}s left)`,
+            (i / allScenes.length) * 100,
+          )
+
+          const submitRes = await fetch('/api/videos', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              prompt: scene.final_prompt,
+              image_urls: scene.grok_ref_images ?? [],
+              duration: 15,
+              aspect_ratio: '9:16',
+              resolution: '720p',
+            }),
+          })
+          if (!submitRes.ok) {
+            const err = await submitRes.json()
+            throw new Error(err.error ?? `Video submission failed for ${key}`)
+          }
+          const { jobId } = await submitRes.json()
+
+          // Poll this job until done, failed, or deadline
+          while (Date.now() < deadline && !videoUrl) {
+            await sleep(5000)
+            const pollRes = await fetch(`/api/videos/${jobId}`)
+            const { status, url, reason } = await pollRes.json()
+            if (status === 'done' && url) {
+              videoUrl = url
+            } else if (status === 'failed') {
+              lastFailReason = reason ?? 'Kie.ai reported state=fail (no reason provided)'
+              break // exit poll loop → outer loop will retry
+            }
           }
         }
 
         if (!videoUrl) {
-          const msg = 'Timed out after 300 s — check credits at kie.ai'
+          const msg = lastFailReason || 'Timed out after 5 minutes — check credits at kie.ai'
           setVideoErrors(prev => ({ ...prev, [key]: msg }))
-          throw new Error(`${key} timed out after 60 polls`)
+          throw new Error(`${key} failed after ${attemptNum} attempt(s) — ${msg}`)
         }
 
         newVideoUrls[key] = videoUrl
