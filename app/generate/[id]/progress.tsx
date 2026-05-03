@@ -293,18 +293,18 @@ export default function Progress({ id }: { id: string }) {
         const script = await scriptRes.json()
         if (script.error) throw new Error(script.error)
         allScripts.push(script)
+        setScripts([...allScripts])
         prevMemo = buildContinuityMemo(episode)
       }
 
-      setScripts(allScripts)
       const totalScenes = allScripts.reduce((n, s) => n + s.scenes.length, 0)
       setPhase(3, 'done', `${totalScenes} scene prompts written across ${allScripts.length} episodes`, 100)
 
       // ── Phase 5: Reference URL Injection (local) ───────────────────────
-      setPhase(4, 'running', 'Injecting @image reference tags into video prompts…')
+      setPhase(4, 'running', 'Assembling final video prompts with reference image URLs…')
       const injectedScripts = injectRefUrls(allScripts, newRefImages, bibleData)
       await sleep(300)
-      setPhase(4, 'done', `${injectedScripts.flatMap(s => s.scenes).length} prompts assembled with @image references`, 100)
+      setPhase(4, 'done', `${injectedScripts.flatMap(s => s.scenes).length} prompts assembled`, 100)
 
       // ── Phase 6: Video Generation ──────────────────────────────────────
       const allScenes = injectedScripts.flatMap(s => s.scenes)
@@ -333,7 +333,7 @@ export default function Progress({ id }: { id: string }) {
         const { jobId } = await submitRes.json()
 
         let videoUrl = ''
-        for (let attempt = 0; attempt < 30 && !videoUrl; attempt++) {
+        for (let attempt = 0; attempt < 60 && !videoUrl; attempt++) {
           await sleep(5000)
           const pollRes = await fetch(`/api/videos/${jobId}`)
           const { status, url, reason } = await pollRes.json()
@@ -594,24 +594,38 @@ export default function Progress({ id }: { id: string }) {
                 </div>
               )}
 
-              {/* Scripts summary */}
+              {/* Scripts output */}
               {scripts.length > 0 && (
                 <div className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-6">
                   <p className="font-mono text-[11px] uppercase tracking-widest text-zinc-500 mb-4">
-                    Scene Prompts ({scripts.reduce((n, s) => n + s.scenes.length, 0)} total)
+                    Scene Scripts ({scripts.reduce((n, s) => n + s.scenes.length, 0)} scenes)
                   </p>
-                  <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
-                    {scripts.slice(0, 5).map(ep =>
-                      ep.scenes.slice(0, 1).map(scene => (
-                        <div key={`${ep.ep_num}-${scene.clip_num}`} className="text-xs text-zinc-500 font-mono">
-                          <span className="text-zinc-400">Ep {ep.ep_num} · Clip {scene.clip_num}</span>{' '}
-                          <span className="text-zinc-600 truncate">— {scene.raw_prompt?.slice(0, 80)}…</span>
+                  <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
+                    {scripts.map(ep => (
+                      <div key={ep.ep_num}>
+                        <p className="text-[11px] font-mono text-zinc-400 font-semibold mb-2">
+                          Episode {ep.ep_num}
+                        </p>
+                        <div className="space-y-2">
+                          {ep.scenes.map(scene => (
+                            <div key={scene.clip_num} className="bg-zinc-800/40 rounded-lg p-3">
+                              <div className="flex items-center gap-2 mb-1.5">
+                                <span className="text-[10px] font-mono bg-red-950/50 text-red-400 border border-red-900/40 px-1.5 py-0.5 rounded">
+                                  Clip {scene.clip_num}
+                                </span>
+                                <span className="text-[10px] font-mono text-zinc-600">
+                                  Step {scene.formula_step} · {scene.venue_used}
+                                </span>
+                                <span className="text-[10px] font-mono text-zinc-600 ml-auto">
+                                  {scene.characters_used?.join(', ')}
+                                </span>
+                              </div>
+                              <p className="text-xs text-zinc-400 leading-relaxed">{scene.raw_prompt}</p>
+                            </div>
+                          ))}
                         </div>
-                      ))
-                    )}
-                    {scripts.length > 5 && (
-                      <p className="text-xs text-zinc-600 font-mono">+ {scripts.length - 5} more episodes…</p>
-                    )}
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}

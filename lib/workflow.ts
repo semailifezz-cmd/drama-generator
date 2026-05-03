@@ -39,13 +39,9 @@ export function injectRefUrls(
 
       const finalRefs = refs.slice(0, 7)
 
-      // Prefix prompt with @imageN tags
-      const tagPrefix = finalRefs.map((_, i) => `@image${i + 1}`).join(' ')
-      const finalPrompt = tagPrefix ? `${tagPrefix} ${scene.raw_prompt}` : scene.raw_prompt
-
       return {
         ...scene,
-        final_prompt: finalPrompt,
+        final_prompt: scene.raw_prompt, // image_urls passed separately — no @imageN tags needed
         grok_ref_images: finalRefs,
       }
     }),
