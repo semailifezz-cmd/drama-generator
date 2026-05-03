@@ -88,14 +88,16 @@ export async function submitVideoJob(payload: {
     return createTask('grok-imagine/image-to-video', {
       image_urls: payload.image_urls,
       prompt: payload.prompt,
-      duration: String(payload.duration),
+      mode: 'normal',
+      duration: String(payload.duration), // image-to-video expects string
       aspect_ratio: payload.aspect_ratio,
       resolution: payload.resolution,
     })
   }
   return createTask('grok-imagine/text-to-video', {
     prompt: payload.prompt,
-    duration: payload.duration,
+    mode: 'normal',
+    duration: payload.duration, // text-to-video expects number
     aspect_ratio: payload.aspect_ratio,
     resolution: payload.resolution,
   })
