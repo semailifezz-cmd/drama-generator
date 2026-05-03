@@ -315,7 +315,7 @@ export default function Progress({ id }: { id: string }) {
         const scene = allScenes[i]
         const key = `ep${scene.ep_num}_clip${scene.clip_num}`
         // Retry loop — keep submitting new jobs until we get a URL or 5 min elapses
-        const deadline = Date.now() + 5 * 60 * 1000
+        const deadline = Date.now() + 10 * 60 * 1000
         let videoUrl = ''
         let lastFailReason = ''
         let attemptNum = 0
@@ -361,7 +361,7 @@ export default function Progress({ id }: { id: string }) {
         }
 
         if (!videoUrl) {
-          const msg = lastFailReason || 'Timed out after 5 minutes — check credits at kie.ai'
+          const msg = lastFailReason || 'Timed out after 10 minutes — check credits at kie.ai'
           setVideoErrors(prev => ({ ...prev, [key]: msg }))
           throw new Error(`${key} failed after ${attemptNum} attempt(s) — ${msg}`)
         }
