@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import type { UniversePrompt, SeriesBible, EpisodeScript } from '@/lib/types'
 import { injectRefUrls, buildContinuityMemo, sleep } from '@/lib/workflow'
+import { upsertDramaEntry, getDramaEntry } from '@/lib/dramaStore'
 
 const PHASES = [
   { id: 1, name: 'Series Bible Generation', desc: 'Gemini generates characters, venues & episode outlines' },
@@ -381,7 +382,20 @@ export default function Progress({ id }: { id: string }) {
       localStorage.setItem(`drama_${id}_result`, JSON.stringify({
         videoUrls: newVideoUrls,
         bible: bibleData,
+        refImages: newRefImages,
+        scripts: allScripts,
       }))
+
+      const existing = getDramaEntry(id)
+      upsertDramaEntry({
+        id,
+        title: bibleData.series_title,
+        genre: bibleData.genre,
+        createdAt: existing?.createdAt ?? new Date().toISOString(),
+        status: 'complete',
+        clipCount: Object.keys(newVideoUrls).length,
+        episodeCount: bibleData.episodes.length,
+      })
 
       setIsComplete(true)
     } catch (err) {
@@ -390,6 +404,10 @@ export default function Progress({ id }: { id: string }) {
       setPhases(prev =>
         prev.map((p, i) => (i === currentPhase ? { ...p, status: 'error', detail: message } : p))
       )
+      const existing = getDramaEntry(id)
+      if (existing) {
+        upsertDramaEntry({ ...existing, status: 'error' })
+      }
     }
   }
 
@@ -416,7 +434,7 @@ export default function Progress({ id }: { id: string }) {
           onClick={() => router.push('/')}
           className="text-zinc-500 hover:text-zinc-300 text-sm transition-colors"
         >
-          ← Back
+          ← Dashboard
         </button>
         <div className="flex-1 min-w-0">
           <p className="font-mono text-[11px] uppercase tracking-widest text-zinc-600">Generating Series</p>
@@ -545,7 +563,7 @@ export default function Progress({ id }: { id: string }) {
                     onClick={() => router.push('/')}
                     className="text-sm bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-4 py-2 rounded-lg transition-colors"
                   >
-                    ← Start over
+                    ← Dashboard
                   </button>
                 </div>
               )}
@@ -736,7 +754,7 @@ export default function Progress({ id }: { id: string }) {
                   ↓ Download All {totalClips} Clips
                 </button>
                 <button
-                  onClick={() => router.push('/')}
+                  onClick={() => router.push('/new')}
                   className="text-sm bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-5 py-2.5 rounded-lg transition-colors"
                 >
                   + New Series
