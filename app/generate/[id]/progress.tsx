@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import type { UniversePrompt, SeriesBible, EpisodeScript } from '@/lib/types'
+import type { UniversePrompt, SeriesBible, EpisodeScript, ScenePrompt } from '@/lib/types'
 import { injectRefUrls, buildContinuityMemo, sleep } from '@/lib/workflow'
 import { upsertDramaEntry, getDramaEntry } from '@/lib/dramaStore'
 
@@ -158,6 +158,100 @@ function EpisodeResultCard({
   )
 }
 
+const STEP_LABELS: Record<number, string> = { 1: 'Humiliation', 2: 'Awakening', 3: 'Climax', 4: 'Exit' }
+
+function SceneCard({ scene }: { scene: ScenePrompt }) {
+  return (
+    <div className="bg-zinc-800/40 border border-zinc-700/30 rounded-xl p-4 space-y-3">
+      {/* Header */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-[10px] font-mono bg-red-950/50 text-red-400 border border-red-900/40 px-1.5 py-0.5 rounded">
+          Clip {scene.clip_num}
+        </span>
+        {scene.segment_duration && (
+          <span className="text-[10px] font-mono bg-zinc-700/60 text-zinc-400 px-1.5 py-0.5 rounded">
+            {scene.segment_duration}
+          </span>
+        )}
+        <span className="text-[10px] font-mono text-zinc-500">
+          Step {scene.formula_step} · {STEP_LABELS[scene.formula_step] ?? ''}
+        </span>
+        <span className="text-[10px] font-mono text-zinc-600 ml-auto truncate max-w-[200px]">
+          {scene.venue_used}
+        </span>
+      </div>
+
+      {/* Camera */}
+      {(scene.camera_angle || scene.camera_movement) && (
+        <div className="space-y-1 bg-zinc-900/50 rounded-lg p-2.5">
+          <p className="text-[10px] font-mono text-zinc-600 uppercase tracking-wider mb-1">Camera</p>
+          {scene.camera_angle && (
+            <div className="flex items-start gap-2">
+              <span className="text-[10px] font-mono text-zinc-600 w-18 flex-shrink-0 mt-0.5">Angle</span>
+              <p className="text-xs text-zinc-400 leading-relaxed">{scene.camera_angle}</p>
+            </div>
+          )}
+          {scene.camera_movement && (
+            <div className="flex items-start gap-2">
+              <span className="text-[10px] font-mono text-zinc-600 w-18 flex-shrink-0 mt-0.5">Movement</span>
+              <p className="text-xs text-zinc-400 leading-relaxed">{scene.camera_movement}</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Characters */}
+      {scene.characters_used.length > 0 && (scene.character_expressions || scene.character_actions) && (
+        <div className="space-y-2">
+          <p className="text-[10px] font-mono text-zinc-600 uppercase tracking-wider">Characters</p>
+          {scene.characters_used.map(name => (
+            <div key={name} className="bg-zinc-900/60 border border-zinc-800/60 rounded-lg p-2.5 space-y-1.5">
+              <p className="text-[11px] font-mono text-zinc-300 font-semibold">{name}</p>
+              {scene.character_expressions?.[name] && (
+                <div className="flex items-start gap-2">
+                  <span className="text-[10px] font-mono text-zinc-600 w-20 flex-shrink-0 mt-0.5">Expression</span>
+                  <p className="text-xs text-zinc-500 leading-relaxed">{scene.character_expressions[name]}</p>
+                </div>
+              )}
+              {scene.character_actions?.[name] && (
+                <div className="flex items-start gap-2">
+                  <span className="text-[10px] font-mono text-zinc-600 w-20 flex-shrink-0 mt-0.5">Action</span>
+                  <p className="text-xs text-zinc-500 leading-relaxed">{scene.character_actions[name]}</p>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Atmosphere / Color */}
+      {(scene.atmosphere || scene.color_ambience) && (
+        <div className="space-y-1 bg-zinc-900/50 rounded-lg p-2.5">
+          <p className="text-[10px] font-mono text-zinc-600 uppercase tracking-wider mb-1">Mood & Color</p>
+          {scene.atmosphere && (
+            <div className="flex items-start gap-2">
+              <span className="text-[10px] font-mono text-zinc-600 w-18 flex-shrink-0 mt-0.5">Atmosphere</span>
+              <p className="text-xs text-zinc-500 leading-relaxed">{scene.atmosphere}</p>
+            </div>
+          )}
+          {scene.color_ambience && (
+            <div className="flex items-start gap-2">
+              <span className="text-[10px] font-mono text-zinc-600 w-18 flex-shrink-0 mt-0.5">Color</span>
+              <p className="text-xs text-zinc-500 leading-relaxed">{scene.color_ambience}</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Final Prompt */}
+      <div className="border-t border-zinc-700/40 pt-3">
+        <p className="text-[10px] font-mono text-zinc-600 uppercase tracking-wider mb-1.5">Video Prompt</p>
+        <p className="text-xs text-zinc-400 leading-relaxed">{scene.raw_prompt}</p>
+      </div>
+    </div>
+  )
+}
+
 export default function Progress({ id }: { id: string }) {
   const router = useRouter()
   const [formData, setFormData] = useState<UniversePrompt | null>(null)
@@ -184,9 +278,11 @@ export default function Progress({ id }: { id: string }) {
     const saved = localStorage.getItem(`drama_${id}_result`)
     if (saved) {
       try {
-        const { videoUrls: savedUrls, bible: savedBible } = JSON.parse(saved)
+        const { videoUrls: savedUrls, bible: savedBible, refImages: savedImages, scripts: savedScripts } = JSON.parse(saved)
         setVideoUrls(savedUrls ?? {})
         setBible(savedBible)
+        setRefImages(savedImages ?? {})
+        setScripts(savedScripts ?? [])
         setIsComplete(true)
         setPhases(PHASES.map(() => ({ status: 'done' as PhaseStatus, progress: 100, detail: '' })))
         setCurrentPhase(PHASES.length - 1)
@@ -455,9 +551,47 @@ export default function Progress({ id }: { id: string }) {
       </header>
 
       <div className="max-w-6xl mx-auto px-6 py-8 space-y-8">
-        {/* Workflow grid */}
-        {!isComplete && (
-          <div className="grid grid-cols-1 lg:grid-cols-[260px,1fr] gap-8">
+        {/* Completion banner */}
+        {isComplete && bible && (
+          <div className="bg-green-950/20 border border-green-900/60 rounded-xl p-6 flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              <p className="text-2xl font-bold text-green-400">Series Complete</p>
+              <p className="text-zinc-400 text-sm mt-1">
+                {bible.episodes.length} episode{bible.episodes.length > 1 ? 's' : ''} · {totalClips} clips · Ready to download
+              </p>
+            </div>
+            <div className="flex gap-3 flex-wrap">
+              <button
+                onClick={async () => {
+                  for (const [key, url] of Object.entries(videoUrls)) {
+                    const [ep, clip] = key.replace('ep', 'Ep').replace('_clip', '_Clip').split('_')
+                    const filename = `${(formData?.series_title ?? 'Series').replace(/\s+/g, '_')}_${ep}_${clip}.mp4`
+                    await downloadVideo(url, filename)
+                    await sleep(400)
+                  }
+                }}
+                className="text-sm bg-green-800 hover:bg-green-700 text-green-100 px-5 py-2.5 rounded-lg font-semibold transition-colors"
+              >
+                ↓ Download All {totalClips} Clips
+              </button>
+              <button
+                onClick={() => router.push(`/drama/${id}`)}
+                className="text-sm bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-5 py-2.5 rounded-lg transition-colors"
+              >
+                View Full Details →
+              </button>
+              <button
+                onClick={() => router.push('/new')}
+                className="text-sm bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-5 py-2.5 rounded-lg transition-colors"
+              >
+                + New Series
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Workflow grid — always visible */}
+        <div className="grid grid-cols-1 lg:grid-cols-[260px,1fr] gap-8">
             {/* Phase list */}
             <div className="space-y-1">
               <p className="font-mono text-[11px] uppercase tracking-widest text-zinc-600 mb-3 px-2">
@@ -641,28 +775,15 @@ export default function Progress({ id }: { id: string }) {
                   <p className="font-mono text-[11px] uppercase tracking-widest text-zinc-500 mb-4">
                     Scene Scripts ({scripts.reduce((n, s) => n + s.scenes.length, 0)} scenes)
                   </p>
-                  <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
+                  <div className="space-y-6">
                     {scripts.map(ep => (
                       <div key={ep.ep_num}>
-                        <p className="text-[11px] font-mono text-zinc-400 font-semibold mb-2">
+                        <p className="text-[11px] font-mono text-zinc-400 font-semibold mb-3 uppercase tracking-wider">
                           Episode {ep.ep_num}
                         </p>
-                        <div className="space-y-2">
+                        <div className="space-y-3">
                           {ep.scenes.map(scene => (
-                            <div key={scene.clip_num} className="bg-zinc-800/40 rounded-lg p-3">
-                              <div className="flex items-center gap-2 mb-1.5">
-                                <span className="text-[10px] font-mono bg-red-950/50 text-red-400 border border-red-900/40 px-1.5 py-0.5 rounded">
-                                  Clip {scene.clip_num}
-                                </span>
-                                <span className="text-[10px] font-mono text-zinc-600">
-                                  Step {scene.formula_step} · {scene.venue_used}
-                                </span>
-                                <span className="text-[10px] font-mono text-zinc-600 ml-auto">
-                                  {scene.characters_used?.join(', ')}
-                                </span>
-                              </div>
-                              <p className="text-xs text-zinc-400 leading-relaxed">{scene.raw_prompt}</p>
-                            </div>
+                            <SceneCard key={scene.clip_num} scene={scene} />
                           ))}
                         </div>
                       </div>
@@ -672,7 +793,7 @@ export default function Progress({ id }: { id: string }) {
               )}
 
               {/* Live video clips — preview + download as each one lands */}
-              {(totalClips > 0 || Object.keys(videoErrors).length > 0) && !isComplete && bible && (
+              {(totalClips > 0 || Object.keys(videoErrors).length > 0) && bible && (
                 <div className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-6">
                   <p className="font-mono text-[11px] uppercase tracking-widest text-zinc-500 mb-4">
                     Video Clips — {totalClips} / {(formData?.total_episodes ?? 1) * 4} ready
@@ -726,53 +847,7 @@ export default function Progress({ id }: { id: string }) {
               )}
             </div>
           </div>
-        )}
-
-        {/* ── Results Gallery ─────────────────────────────────────────── */}
-        {isComplete && bible && (
-          <div className="space-y-6">
-            {/* Complete header */}
-            <div className="bg-green-950/20 border border-green-900/60 rounded-xl p-6 flex items-center justify-between gap-4 flex-wrap">
-              <div>
-                <p className="text-2xl font-bold text-green-400">Series Complete</p>
-                <p className="text-zinc-400 text-sm mt-1">
-                  {bible.episodes.length} episode{bible.episodes.length > 1 ? 's' : ''} · {totalClips} clips · Ready to download
-                </p>
-              </div>
-              <div className="flex gap-3 flex-wrap">
-                <button
-                  onClick={async () => {
-                    for (const [key, url] of Object.entries(videoUrls)) {
-                      const [ep, clip] = key.replace('ep', 'Ep').replace('_clip', '_Clip').split('_')
-                      const filename = `${(formData?.series_title ?? 'Series').replace(/\s+/g, '_')}_${ep}_${clip}.mp4`
-                      await downloadVideo(url, filename)
-                      await sleep(400)
-                    }
-                  }}
-                  className="text-sm bg-green-800 hover:bg-green-700 text-green-100 px-5 py-2.5 rounded-lg font-semibold transition-colors"
-                >
-                  ↓ Download All {totalClips} Clips
-                </button>
-                <button
-                  onClick={() => router.push('/new')}
-                  className="text-sm bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-5 py-2.5 rounded-lg transition-colors"
-                >
-                  + New Series
-                </button>
-              </div>
-            </div>
-
-            {/* Episode cards */}
-            {bible.episodes.map(ep => (
-              <EpisodeResultCard
-                key={ep.ep_num}
-                episode={ep}
-                videoUrls={videoUrls}
-                seriesTitle={formData?.series_title ?? 'Series'}
-              />
-            ))}
-          </div>
-        )}
+        </div>
       </div>
     </div>
   )

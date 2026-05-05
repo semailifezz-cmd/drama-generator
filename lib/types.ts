@@ -64,9 +64,16 @@ export interface ScenePrompt {
   scene_num: number
   clip_num: number
   formula_step: number
+  segment_duration?: string
   characters_used: string[]
   venue_used: string
   props_used: string[]
+  character_expressions?: Record<string, string>
+  character_actions?: Record<string, string>
+  camera_angle?: string
+  camera_movement?: string
+  atmosphere?: string
+  color_ambience?: string
   raw_prompt: string
   final_prompt?: string
   grok_ref_images?: string[]
