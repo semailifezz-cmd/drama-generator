@@ -68,3 +68,11 @@ export function saveDramaResult(id: string, result: DramaResult): void {
   if (typeof window === 'undefined') return
   localStorage.setItem(`drama_${id}_result`, JSON.stringify(result))
 }
+
+export function deleteDramaEntry(id: string): void {
+  if (typeof window === 'undefined') return
+  const index = readIndex().filter(e => e.id !== id)
+  localStorage.setItem('drama_index', JSON.stringify(index))
+  localStorage.removeItem(`drama_${id}`)
+  localStorage.removeItem(`drama_${id}_result`)
+}

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { getDramaIndex } from '@/lib/dramaStore'
+import { getDramaIndex, deleteDramaEntry } from '@/lib/dramaStore'
 import type { DramaEntry } from '@/lib/dramaStore'
 
 function formatDate(iso: string): string {
@@ -35,11 +35,19 @@ function StatusBadge({ status }: { status: DramaEntry['status'] }) {
   )
 }
 
-function DramaCard({ entry }: { entry: DramaEntry }) {
+function DramaCard({ entry, onDelete }: { entry: DramaEntry; onDelete: (id: string) => void }) {
   const router = useRouter()
+  const [confirming, setConfirming] = useState(false)
   const href = entry.status === 'generating'
     ? `/generate/${entry.id}`
     : `/drama/${entry.id}`
+
+  function handleDelete(e: React.MouseEvent) {
+    e.stopPropagation()
+    if (!confirming) { setConfirming(true); return }
+    deleteDramaEntry(entry.id)
+    onDelete(entry.id)
+  }
 
   return (
     <div className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-5 flex flex-col gap-3 hover:border-zinc-700 transition-colors group">
@@ -50,7 +58,21 @@ function DramaCard({ entry }: { entry: DramaEntry }) {
           </p>
           <p className="text-xs text-zinc-500 mt-0.5 font-mono">{entry.genre}</p>
         </div>
-        <StatusBadge status={entry.status} />
+        <div className="flex items-center gap-2 shrink-0">
+          <StatusBadge status={entry.status} />
+          <button
+            onClick={handleDelete}
+            onBlur={() => setConfirming(false)}
+            title={confirming ? 'Click again to confirm delete' : 'Delete series'}
+            className={`text-[10px] font-mono px-2 py-0.5 rounded border transition-colors ${
+              confirming
+                ? 'bg-red-900/60 text-red-300 border-red-700'
+                : 'bg-zinc-800 text-zinc-600 border-zinc-700 hover:text-red-400 hover:border-red-800'
+            }`}
+          >
+            {confirming ? 'confirm?' : '✕'}
+          </button>
+        </div>
       </div>
 
       <div className="flex items-center gap-4 text-[11px] font-mono text-zinc-600">
@@ -83,6 +105,10 @@ export default function Dashboard() {
     setDramas(getDramaIndex())
     setLoaded(true)
   }, [])
+
+  function handleDelete(id: string) {
+    setDramas(prev => prev.filter(d => d.id !== id))
+  }
 
   const ongoing = dramas.filter(d => d.status === 'generating')
   const completed = dramas.filter(d => d.status === 'complete')
@@ -138,7 +164,7 @@ export default function Dashboard() {
               Generating Now
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {ongoing.map(d => <DramaCard key={d.id} entry={d} />)}
+              {ongoing.map(d => <DramaCard key={d.id} entry={d} onDelete={handleDelete} />)}
             </div>
           </section>
         )}
@@ -150,7 +176,7 @@ export default function Dashboard() {
               Completed
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {completed.map(d => <DramaCard key={d.id} entry={d} />)}
+              {completed.map(d => <DramaCard key={d.id} entry={d} onDelete={handleDelete} />)}
             </div>
           </section>
         )}
@@ -162,7 +188,7 @@ export default function Dashboard() {
               Stopped
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {failed.map(d => <DramaCard key={d.id} entry={d} />)}
+              {failed.map(d => <DramaCard key={d.id} entry={d} onDelete={handleDelete} />)}
             </div>
           </section>
         )}
