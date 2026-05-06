@@ -849,6 +849,5 @@ export default function Progress({ id }: { id: string }) {
           </div>
         </div>
       </div>
-    </div>
   )
 }
