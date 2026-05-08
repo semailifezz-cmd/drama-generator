@@ -277,45 +277,100 @@ export default function ExtendWorkflow({ id }: { id: string }) {
       <div className="max-w-5xl mx-auto px-6 py-8 space-y-6">
         {/* Form */}
         {step === 'form' && (
-          <div className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-8 max-w-xl mx-auto">
-            <p className="font-mono text-[11px] uppercase tracking-widest text-zinc-500 mb-2">Continue Story</p>
-            <h2 className="text-xl font-bold text-white mb-1">{seriesTitle}</h2>
-            <p className="text-sm text-zinc-500 mb-6">
-              Currently {existingEpCount} episode{existingEpCount !== 1 ? 's' : ''}. New episodes will use the same characters, venues, and visual style.
-            </p>
-            <div className="mb-6">
-              <label className="block text-xs font-medium text-zinc-400 mb-1.5">Episodes to generate</label>
-              <select
-                value={numEpisodes}
-                onChange={e => setNumEpisodes(parseInt(e.target.value))}
-                className="w-full bg-zinc-800/60 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-zinc-100 focus:outline-none focus:border-red-600/60 transition-colors"
+          <div className="max-w-xl mx-auto space-y-6">
+            {/* Hero */}
+            <div>
+              <p className="font-mono text-xs tracking-widest uppercase text-red-500 mb-3">
+                AI-Powered Production Pipeline
+              </p>
+              <h1 className="text-4xl font-bold tracking-tight text-white leading-tight mb-3">
+                Generate More<br />
+                <span className="text-red-500">Episodes</span>
+              </h1>
+              <p className="text-zinc-400 text-sm mb-5">
+                Continues your story with the same characters, venues, and visual style — new episode outlines, cinematic scene scripts, and stitched 60-second clips.
+              </p>
+              {/* Pipeline steps */}
+              <div className="flex items-center flex-wrap gap-0">
+                {[
+                  '① Extend Bible',
+                  '② Scene Scripts',
+                  '③ Ref Inject',
+                  '④ Video Gen',
+                  '⑤ Merge',
+                ].map((step, i, arr) => (
+                  <div key={step} className="flex items-center">
+                    <div className="bg-zinc-900 border border-zinc-700/60 rounded px-3 py-1.5 text-xs font-mono text-zinc-400">
+                      {step}
+                    </div>
+                    {i < arr.length - 1 && (
+                      <span className="text-zinc-700 px-1 text-sm">→</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Phase breakdown */}
+            <div className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-5 space-y-3">
+              <p className="font-mono text-[11px] uppercase tracking-widest text-zinc-500 mb-1">What happens</p>
+              {PHASES.map((phase, i) => (
+                <div key={phase.id} className="flex items-start gap-3">
+                  <div className="w-5 h-5 rounded-full bg-zinc-800/80 border border-zinc-700 flex items-center justify-center text-[10px] font-bold text-zinc-500 flex-shrink-0 mt-0.5">
+                    {phase.id}
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-zinc-300">{phase.name}</p>
+                    <p className="text-[11px] text-zinc-600 mt-0.5">{phase.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Config card */}
+            <div className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-6">
+              <p className="font-mono text-[11px] uppercase tracking-widest text-zinc-500 mb-1">Continue Story</p>
+              <p className="text-base font-bold text-white mb-1">{seriesTitle}</p>
+              <p className="text-xs text-zinc-500 mb-5">
+                Currently {existingEpCount} episode{existingEpCount !== 1 ? 's' : ''}. New episodes will continue from where the series left off.
+              </p>
+              <div className="mb-5">
+                <label className="block text-xs font-medium text-zinc-400 mb-1.5">Episodes to generate</label>
+                <select
+                  value={numEpisodes}
+                  onChange={e => setNumEpisodes(parseInt(e.target.value))}
+                  className="w-full bg-zinc-800/60 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-zinc-100 focus:outline-none focus:border-red-600/60 transition-colors"
+                >
+                  <option value={1}>1 episode (~$3)</option>
+                  <option value={5}>5 episodes (~$16)</option>
+                  <option value={10}>10 episodes (~$33)</option>
+                  <option value={20}>20 episodes (~$65)</option>
+                </select>
+              </div>
+              <div className="bg-zinc-800/40 rounded-lg p-4 mb-5 grid grid-cols-3 gap-4 text-center">
+                <div>
+                  <div className="text-2xl font-bold text-white">{numEpisodes}</div>
+                  <div className="text-[11px] text-zinc-500 font-mono mt-0.5">New Episodes</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-white">{numEpisodes * 4}</div>
+                  <div className="text-[11px] text-zinc-500 font-mono mt-0.5">New Clips</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-red-400">~${Math.round(numEpisodes * 3.25)}</div>
+                  <div className="text-[11px] text-zinc-500 font-mono mt-0.5">Est. Cost</div>
+                </div>
+              </div>
+              <p className="text-[11px] text-zinc-600 font-mono text-center mb-5">
+                4 clips × 15s per episode · 9:16 · 720p · ~{Math.round(numEpisodes * 4 * 17 / 60)}min total runtime
+              </p>
+              <button
+                onClick={startExtend}
+                className="w-full bg-red-700 hover:bg-red-600 text-white font-semibold py-4 rounded-xl transition-colors text-base"
               >
-                <option value={1}>1 episode (~$3)</option>
-                <option value={5}>5 episodes (~$16)</option>
-                <option value={10}>10 episodes (~$33)</option>
-                <option value={20}>20 episodes (~$65)</option>
-              </select>
+                Generate {numEpisodes} More Episode{numEpisodes !== 1 ? 's' : ''} →
+              </button>
             </div>
-            <div className="bg-zinc-800/40 rounded-lg p-4 mb-6 grid grid-cols-3 gap-4 text-center">
-              <div>
-                <div className="text-xl font-bold text-white">{numEpisodes}</div>
-                <div className="text-[11px] text-zinc-500 font-mono mt-0.5">New Episodes</div>
-              </div>
-              <div>
-                <div className="text-xl font-bold text-white">{numEpisodes * 4}</div>
-                <div className="text-[11px] text-zinc-500 font-mono mt-0.5">New Clips</div>
-              </div>
-              <div>
-                <div className="text-xl font-bold text-red-400">~${Math.round(numEpisodes * 3.25)}</div>
-                <div className="text-[11px] text-zinc-500 font-mono mt-0.5">Est. Cost</div>
-              </div>
-            </div>
-            <button
-              onClick={startExtend}
-              className="w-full bg-red-700 hover:bg-red-600 text-white font-semibold py-3.5 rounded-xl transition-colors"
-            >
-              Generate {numEpisodes} More Episode{numEpisodes !== 1 ? 's' : ''} →
-            </button>
           </div>
         )}
 
