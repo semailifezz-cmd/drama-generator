@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { getDramaInput, getDramaResult, getDramaEntry, upsertDramaEntry, saveDramaResult } from '@/lib/dramaStore'
 import type { DramaResult } from '@/lib/dramaStore'
 import { injectRefUrls, buildContinuityMemo, sleep } from '@/lib/workflow'
-import type { EpisodeOutline, EpisodeScript, SeriesBible } from '@/lib/types'
+import type { EpisodeOutline, EpisodeScript, SeriesBible, ScenePrompt } from '@/lib/types'
 
 type PhaseStatus = 'idle' | 'running' | 'done' | 'error'
 interface PhaseState { status: PhaseStatus; progress: number; detail: string }
@@ -51,6 +51,95 @@ function VideoCard({ epNum, clipNum, url, seriesTitle }: { epNum: number; clipNu
   )
 }
 
+const STEP_LABELS: Record<number, string> = { 1: 'Humiliation', 2: 'Awakening', 3: 'Climax', 4: 'Exit' }
+
+function SceneCard({ scene }: { scene: ScenePrompt }) {
+  return (
+    <div className="bg-zinc-800/40 border border-zinc-700/30 rounded-xl p-4 space-y-3">
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-[10px] font-mono bg-red-950/50 text-red-400 border border-red-900/40 px-1.5 py-0.5 rounded">
+          Clip {scene.clip_num}
+        </span>
+        {scene.segment_duration && (
+          <span className="text-[10px] font-mono bg-zinc-700/60 text-zinc-400 px-1.5 py-0.5 rounded">
+            {scene.segment_duration}
+          </span>
+        )}
+        <span className="text-[10px] font-mono text-zinc-500">
+          Step {scene.formula_step} · {STEP_LABELS[scene.formula_step] ?? ''}
+        </span>
+        <span className="text-[10px] font-mono text-zinc-600 ml-auto truncate max-w-[200px]">
+          {scene.venue_used}
+        </span>
+      </div>
+
+      {(scene.camera_angle || scene.camera_movement) && (
+        <div className="space-y-1 bg-zinc-900/50 rounded-lg p-2.5">
+          <p className="text-[10px] font-mono text-zinc-600 uppercase tracking-wider mb-1">Camera</p>
+          {scene.camera_angle && (
+            <div className="flex items-start gap-2">
+              <span className="text-[10px] font-mono text-zinc-600 w-18 flex-shrink-0 mt-0.5">Angle</span>
+              <p className="text-xs text-zinc-400 leading-relaxed">{scene.camera_angle}</p>
+            </div>
+          )}
+          {scene.camera_movement && (
+            <div className="flex items-start gap-2">
+              <span className="text-[10px] font-mono text-zinc-600 w-18 flex-shrink-0 mt-0.5">Movement</span>
+              <p className="text-xs text-zinc-400 leading-relaxed">{scene.camera_movement}</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {scene.characters_used.length > 0 && (scene.character_expressions || scene.character_actions) && (
+        <div className="space-y-2">
+          <p className="text-[10px] font-mono text-zinc-600 uppercase tracking-wider">Characters</p>
+          {scene.characters_used.map(name => (
+            <div key={name} className="bg-zinc-900/60 border border-zinc-800/60 rounded-lg p-2.5 space-y-1.5">
+              <p className="text-[11px] font-mono text-zinc-300 font-semibold">{name}</p>
+              {scene.character_expressions?.[name] && (
+                <div className="flex items-start gap-2">
+                  <span className="text-[10px] font-mono text-zinc-600 w-20 flex-shrink-0 mt-0.5">Expression</span>
+                  <p className="text-xs text-zinc-500 leading-relaxed">{scene.character_expressions[name]}</p>
+                </div>
+              )}
+              {scene.character_actions?.[name] && (
+                <div className="flex items-start gap-2">
+                  <span className="text-[10px] font-mono text-zinc-600 w-20 flex-shrink-0 mt-0.5">Action</span>
+                  <p className="text-xs text-zinc-500 leading-relaxed">{scene.character_actions[name]}</p>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {(scene.atmosphere || scene.color_ambience) && (
+        <div className="space-y-1 bg-zinc-900/50 rounded-lg p-2.5">
+          <p className="text-[10px] font-mono text-zinc-600 uppercase tracking-wider mb-1">Mood & Color</p>
+          {scene.atmosphere && (
+            <div className="flex items-start gap-2">
+              <span className="text-[10px] font-mono text-zinc-600 w-18 flex-shrink-0 mt-0.5">Atmosphere</span>
+              <p className="text-xs text-zinc-500 leading-relaxed">{scene.atmosphere}</p>
+            </div>
+          )}
+          {scene.color_ambience && (
+            <div className="flex items-start gap-2">
+              <span className="text-[10px] font-mono text-zinc-600 w-18 flex-shrink-0 mt-0.5">Color</span>
+              <p className="text-xs text-zinc-500 leading-relaxed">{scene.color_ambience}</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="border-t border-zinc-700/40 pt-3">
+        <p className="text-[10px] font-mono text-zinc-600 uppercase tracking-wider mb-1.5">Video Prompt</p>
+        <p className="text-xs text-zinc-400 leading-relaxed">{scene.raw_prompt}</p>
+      </div>
+    </div>
+  )
+}
+
 export default function ExtendWorkflow({ id }: { id: string }) {
   const router = useRouter()
   const [step, setStep] = useState<'form' | 'working' | 'done' | 'error'>('form')
@@ -60,6 +149,7 @@ export default function ExtendWorkflow({ id }: { id: string }) {
   const [videoUrls, setVideoUrls] = useState<Record<string, string>>({})
   const [videoErrors, setVideoErrors] = useState<Record<string, string>>({})
   const [newEpisodes, setNewEpisodes] = useState<EpisodeOutline[]>([])
+  const [newScripts, setNewScripts] = useState<EpisodeScript[]>([])
   const [error, setError] = useState<string | null>(null)
   const [existingBible, setExistingBible] = useState<SeriesBible | null>(null)
   const startedRef = useRef(false)
@@ -139,6 +229,7 @@ export default function ExtendWorkflow({ id }: { id: string }) {
         const script = await scriptRes.json()
         if (script.error) throw new Error(script.error)
         newScripts.push(script)
+        setNewScripts([...newScripts])
         prevMemo = buildContinuityMemo(ep)
       }
 
@@ -434,6 +525,29 @@ export default function ExtendWorkflow({ id }: { id: string }) {
                       <p className="text-sm text-red-400 font-mono break-all">{phases[currentPhase].detail}</p>
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* Scene scripts */}
+              {newScripts.length > 0 && (
+                <div className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-6">
+                  <p className="font-mono text-[11px] uppercase tracking-widest text-zinc-500 mb-4">
+                    Scene Scripts ({newScripts.reduce((n, s) => n + s.scenes.length, 0)} scenes)
+                  </p>
+                  <div className="space-y-6">
+                    {newScripts.map(ep => (
+                      <div key={ep.ep_num}>
+                        <p className="text-[11px] font-mono text-zinc-400 font-semibold mb-3 uppercase tracking-wider">
+                          Episode {ep.ep_num}
+                        </p>
+                        <div className="space-y-3">
+                          {ep.scenes.map(scene => (
+                            <SceneCard key={scene.clip_num} scene={scene} />
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 
